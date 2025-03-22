@@ -2,74 +2,78 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 from sklearn import datasets
-import matplotlib.pyplot as plt
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.metrics import accuracy_score, mean_squared_error
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, accuracy_score
 
-st.set_page_config(page_title="ML Model Deployment", layout="wide")
+# Set page config
+apptitle = 'DSSI Toy App'
+st.set_page_config(page_title=apptitle, layout='wide')
 
-st.title('Machine Learning Model Deployment')
-st.write('Predict target values by entering feature values below')
+st.title('Diabetes Classification')
+st.write('A simple model to classify if someone is diabetic or not.')
 
-# Load diabetes dataset (example dataset)
+# Load diabetes dataset
 db = datasets.load_diabetes()
+
+# Create a DataFrame
 df = pd.DataFrame(db.data, columns=db.feature_names)
+target = db.target
 
-# Select target variable
-target = 'target'
+# Convert the regression target into a binary classification target
+binary_target = (target > 150).astype(int)
 
-# Use the diabetes target as the target column
-df[target] = db.target
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(df, binary_target, test_size=0.2, random_state=42)
 
-# Preprocessing the data
-X = df.drop(columns=[target])
-y = df[target]
+# Standardize the data (important for models like Logistic Regression)
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
-# Handle categorical columns by getting dummies (one-hot encoding)
-X = pd.get_dummies(X)
+# Train a Logistic Regression classifier
+model = LogisticRegression()
+model.fit(X_train_scaled, y_train)
 
-# Train/Test Split
-test_size = 0.2
-random_state = 42
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
+# Make predictions
+y_pred = model.predict(X_test_scaled)
 
-# Initialize and train the model
-model = RandomForestRegressor(n_estimators=100, random_state=random_state)
-model.fit(X_train, y_train)
+# Evaluate the model
+accuracy = accuracy_score(y_test, y_pred)
+report = classification_report(y_test, y_pred)
 
-# Evaluate Model (optional, for reference)
-y_pred = model.predict(X_test)
-mse = mean_squared_error(y_test, y_pred)
-st.write(f"Model Performance: Mean Squared Error (MSE): {mse:.2f}")
+# Display results
+st.subheader('Model Accuracy')
+st.write(f"Accuracy: {accuracy:.2f}")
 
-# User Input for Prediction
-st.write("## Predict Target Value")
-# Get the features of the dataset
-feature_names = X.columns.tolist()
+st.subheader('Classification Report')
+st.text(report)
 
-# Create a dictionary to store the user inputs
-user_input = {}
+# --- New Section: User Input ---
+st.subheader('Enter Your Data for Prediction')
 
-# Get user inputs for each feature
-for feature in feature_names:
-    user_input[feature] = st.number_input(f"Enter value for {feature}", min_value=float(df[feature].min()), max_value=float(df[feature].max()), value=float(df[feature].mean()))
+# Create number input widgets for the user to enter their data
+age = st.number_input('Age', min_value=0, max_value=120, value=50)
+sex = st.number_input('Sex (0 = Female, 1 = Male)', min_value=0, max_value=1, value=1)
+bmi = st.number_input('BMI', min_value=10.0, max_value=50.0, value=25.0)
+bp = st.number_input('Blood Pressure (mm Hg)', min_value=50, max_value=200, value=80)
+s1 = st.number_input('S1', min_value=0.0, max_value=10.0, value=0.0)
+s2 = st.number_input('S2', min_value=0.0, max_value=10.0, value=0.0)
+s3 = st.number_input('S3', min_value=0.0, max_value=10.0, value=0.0)
+s4 = st.number_input('S4', min_value=0.0, max_value=10.0, value=0.0)
+s5 = st.number_input('S5', min_value=0.0, max_value=10.0, value=0.0)
+s6 = st.number_input('S6', min_value=0.0, max_value=10.0, value=0.0)
 
-# Convert user input into a DataFrame to match the feature format
-user_input_df = pd.DataFrame([user_input])
+# Store the input data in a DataFrame
+user_data = np.array([[age, sex, bmi, bp, s1, s2, s3, s4, s5, s6]])
+user_data_scaled = scaler.transform(user_data)
 
-# Handle categorical columns by getting dummies (one-hot encoding)
-user_input_df = pd.get_dummies(user_input_df)
+# Predict using the trained model
+prediction = model.predict(user_data_scaled)
 
-# Make sure the user input has the same columns as the model expects
-missing_cols = set(X.columns) - set(user_input_df.columns)
-for col in missing_cols:
-    user_input_df[col] = 0
-user_input_df = user_input_df[X.columns]  # Reorder the columns to match X
-
-# Make prediction using the trained model
-prediction = model.predict(user_input_df)
-
-# Display the predicted value
-st.write("### Predicted Target Value:")
-st.write(f"**Prediction:** {prediction[0]:.2f}")
+# Show the prediction result
+if prediction == 1:
+    st.write("The model predicts that the person is **diabetic**.")
+else:
+    st.write("The model predicts that the person is **not diabetic**.")
