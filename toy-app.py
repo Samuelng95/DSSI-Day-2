@@ -3,89 +3,73 @@ import numpy as np
 import pandas as pd
 from sklearn import datasets
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import accuracy_score, mean_squared_error
+from sklearn.model_selection import train_test_split
 
-# ✅ KEEP ONLY THIS st.set_page_config() AT THE TOP
 st.set_page_config(page_title="ML Model Deployment", layout="wide")
 
-st.title('My First Streamlit Application')
-st.write('Reference: https://docs.streamlit.io/en/stable/api.html#display-data')
-st.balloons() 
+st.title('Machine Learning Model Deployment')
+st.write('Predict target values by entering feature values below')
 
-# Load diabetes dataset
-st.subheader('**Diabetes Data**')
+# Load diabetes dataset (example dataset)
 db = datasets.load_diabetes()
 df = pd.DataFrame(db.data, columns=db.feature_names)
 
-col1, col2 = st.columns([2,1])
-with col1:
-    st.dataframe(df, use_container_width=True)
-with col2:
-    fig, ax = plt.subplots(figsize=(6, 3))
-    df['age'].hist(bins=10, ax=ax)
-    fig.suptitle("Age Distribution")
-    st.pyplot(fig)
+# Select target variable
+target = 'target'
 
-# ✅ REMOVE SECOND st.set_page_config()
+# Use the diabetes target as the target column
+df[target] = db.target
 
-# Upload dataset
-st.sidebar.header("Upload Your Dataset 📂")
-uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
+# Preprocessing the data
+X = df.drop(columns=[target])
+y = df[target]
 
-if uploaded_file:
-    df = pd.read_csv(uploaded_file)
-    st.write("### Preview of the Dataset")
-    st.dataframe(df.head())
+# Handle categorical columns by getting dummies (one-hot encoding)
+X = pd.get_dummies(X)
 
-    # Select target variable
-    target = st.sidebar.selectbox("Select Target Column", df.columns)
+# Train/Test Split
+test_size = 0.2
+random_state = 42
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
 
-    # Choose ML model type
-    model_type = st.sidebar.radio("Choose Model Type", ["Classification", "Regression"])
+# Initialize and train the model
+model = RandomForestRegressor(n_estimators=100, random_state=random_state)
+model.fit(X_train, y_train)
 
-    # Train/Test Split
-    st.sidebar.write("### Train/Test Split")
-    test_size = st.sidebar.slider("Test Size (%)", 10, 50, 20, step=5) / 100
-    random_state = st.sidebar.number_input("Random Seed", value=42)
+# Evaluate Model (optional, for reference)
+y_pred = model.predict(X_test)
+mse = mean_squared_error(y_test, y_pred)
+st.write(f"Model Performance: Mean Squared Error (MSE): {mse:.2f}")
 
-    # Splitting Data
-    X = df.drop(columns=[target])
-    y = df[target]
-    X = pd.get_dummies(X)
+# User Input for Prediction
+st.write("## Predict Target Value")
+# Get the features of the dataset
+feature_names = X.columns.tolist()
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
+# Create a dictionary to store the user inputs
+user_input = {}
 
-    # Initialize Model
-    model = RandomForestClassifier(n_estimators=100, random_state=random_state) if model_type == "Classification" else RandomForestRegressor(n_estimators=100, random_state=random_state)
+# Get user inputs for each feature
+for feature in feature_names:
+    user_input[feature] = st.number_input(f"Enter value for {feature}", min_value=float(df[feature].min()), max_value=float(df[feature].max()), value=float(df[feature].mean()))
 
-    # Train Model
-    model.fit(X_train, y_train)
+# Convert user input into a DataFrame to match the feature format
+user_input_df = pd.DataFrame([user_input])
 
-    # Predictions
-    y_pred = model.predict(X_test)
+# Handle categorical columns by getting dummies (one-hot encoding)
+user_input_df = pd.get_dummies(user_input_df)
 
-    # Evaluate Model
-    st.write("## Model Performance")
-    if model_type == "Classification":
-        accuracy = accuracy_score(y_test, y_pred)
-        st.write(f"**Accuracy:** {accuracy:.2f}")
-    else:
-        mse = mean_squared_error(y_test, y_pred)
-        st.write(f"**Mean Squared Error:** {mse:.2f}")
+# Make sure the user input has the same columns as the model expects
+missing_cols = set(X.columns) - set(user_input_df.columns)
+for col in missing_cols:
+    user_input_df[col] = 0
+user_input_df = user_input_df[X.columns]  # Reorder the columns to match X
 
-    # Feature Importance
-    st.write("## Feature Importance")
-    feature_importance = pd.Series(model.feature_importances_, index=X.columns)
-    fig, ax = plt.subplots(figsize=(8, 4))
-    feature_importance.nlargest(10).plot(kind='barh', ax=ax)
-    ax.set_title("Top 10 Important Features")
-    st.pyplot(fig)
+# Make prediction using the trained model
+prediction = model.predict(user_input_df)
 
-    # Correlation Heatmap
-    st.write("## Correlation Heatmap")
-    fig, ax = plt.subplots(figsize=(8, 6))
-    sns.heatmap(df.corr(), annot=True, cmap="coolwarm", fmt=".2f", linewidths=0.5, ax=ax)
-    st.pyplot(fig)
+# Display the predicted value
+st.write("### Predicted Target Value:")
+st.write(f"**Prediction:** {prediction[0]:.2f}")
