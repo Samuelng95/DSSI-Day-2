@@ -31,3 +31,14 @@ with col2:
         df['age'].hist(bins = 10, ax=ax)
         fig.suptitle("Age Distribution")
         st.pyplot(fig)
+# Create a figure and axis
+fig, ax = plt.subplots(figsize=(6, 3))
+
+# Plot histogram
+df['age'].hist(bins=10, ax=ax)
+
+# Set title
+fig.suptitle("Age Distribution")
+
+# Display the plot in Streamlit
+st.pyplot(fig)
